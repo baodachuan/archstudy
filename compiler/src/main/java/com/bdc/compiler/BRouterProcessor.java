@@ -2,8 +2,14 @@ package com.bdc.compiler;
 
 import com.bdc.annotation.BRouter;
 import com.google.auto.service.AutoService;
+import com.squareup.javapoet.ClassName;
+import com.squareup.javapoet.JavaFile;
+import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.TypeSpec;
 
+import java.io.IOException;
 import java.io.Writer;
+import java.lang.reflect.Type;
 import java.util.Set;
 
 import javax.annotation.processing.AbstractProcessor;
@@ -17,6 +23,7 @@ import javax.annotation.processing.SupportedOptions;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
@@ -57,23 +64,31 @@ public class BRouterProcessor extends AbstractProcessor {
             String className = element.getSimpleName().toString();
             messager.printMessage(Diagnostic.Kind.NOTE, "annotated class is " + className);
             String finalClasseNmae = className + "$$BRouter";
+            BRouter bRouter = element.getAnnotation(BRouter.class);
+
+            MethodSpec methodSpec = MethodSpec.methodBuilder("findTargetClass")
+                    .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                    .returns(Class.class)
+                    .addParameter(String[].class, "path")
+                    .addStatement("return path.equals($S)?$T.class:null",
+                            bRouter.path(),
+                            ClassName.get((TypeElement) element))
+                    .build();
+
+            TypeSpec typeSpec = TypeSpec.classBuilder(finalClasseNmae)
+                    .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+                    .addMethod(methodSpec)
+                    .build();
+
+            JavaFile javaFile = JavaFile.builder(packageName, typeSpec)
+                    .build();
+
             try {
-                JavaFileObject sourceFile = filer.createSourceFile(packageName + "." + finalClasseNmae);
-                Writer writer = sourceFile.openWriter();
-                writer.write("package " + packageName + ";\n");
-                writer.write("public class " + finalClasseNmae + "{\n");
-                writer.write("public static Class<?> findTargetClass(String path) {\n");
-                BRouter router = element.getAnnotation(BRouter.class);
-                writer.write("if (path.equals(\"" + router.path() + "\")){\n");
-                writer.write("return  " + className + ".class;\n}\n");
-                writer.write("return  null;\n");
-                writer.write("}\n}");
-                writer.close();
-
-
-            } catch (Exception e) {
-
+                javaFile.writeTo(filer);
+            } catch (IOException e) {
+                e.printStackTrace();
             }
+
 
         }
 
