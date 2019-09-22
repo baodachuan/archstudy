@@ -10,5 +10,9 @@ dependencies {
     implementation project(':annotation')
 }
 
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+}
+
 sourceCompatibility = "7"
 targetCompatibility = "7"
